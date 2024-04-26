@@ -72,7 +72,7 @@ def ordinary_kriging(z_df, source_coordinates_df, min_x,max_x,min_y,max_y,gridsi
 
 #--------------------------------------------------------------------------------------------------------------------------------------
 # %% 
-"""# create interpolation data arrays"""
+"""create interpolation data arrays"""
 def create_interpolation_data(spatial_data: pd.DataFrame, 
                        sensor_coords: pd.DataFrame)-> List[np.ndarray]:
     """
