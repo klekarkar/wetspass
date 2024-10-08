@@ -74,37 +74,76 @@ def ordinary_kriging(z_df, source_coordinates_df, min_x,max_x,min_y,max_y,gridsi
 #--------------------------------------------------------------------------------------------------------------------------------------
 # %% 
 """create interpolation data arrays"""
-def create_interpolation_data(spatial_data: pd.DataFrame, 
-                       sensor_coords: pd.DataFrame)-> List[np.ndarray]:
+def create_interpolation_data(obs_data: pd.DataFrame, 
+                       obs_coords: pd.DataFrame)-> List[np.ndarray]:
     """
-    Prepares spatial data for interpolation by associating groundwater measurements
+    Prepares spatial data for interpolation by associating observations
     with their spatial coordinates.
     
     Parameters:
-    - spatial_data: DataFrame containing the groundwater data with dates and measurement values 
-        (format: rows = timesteps, columns = piezometers)
-    - sensor_coords: DataFrame containing the coordinates of piezometers.
+    - obs_data: DataFrame containing the observed data with dates and measurement values 
+        (format: rows = timesteps, columns = names of in situ locations
+          e.g. date|obs1|obs2|obs3|...|obsN)
+               01/01/2000|1.0|2.0|3.0|...|N
+               02/01/2000|2.0|4.0|3.0|...|N
+    - obs_coords: DataFrame containing the coordinates of in situ locations, expected to have columns for x, y coordinates.
     
     Returns:
     - A list of numpy arrays, each containing the spatial coordinates and groundwater measurements
       for each timestep.
     """
-    z_data_list = [] #list of tacked arrays containing the spatial coordinates and corresponding data values for each timestep
-    for i in range(len(spatial_data)): # Iterate through each timestep
-        z_array = spatial_data.iloc[i, :].to_numpy().reshape(-1, 1)
-        data_coords = sensor_coords.iloc[:, :2].to_numpy()
+    z_data_list = [] #list of stacked arrays containing the spatial coordinates and corresponding data values for each timestep
+    data_coords = obs_coords.iloc[:, :2].to_numpy() #constant coordinates
+    assert data_coords.shape[0] == obs_data.shape[1], "Mismatch in number of locations between spatial data and coordinates."
 
-        valid_indices = ~np.isnan(z_array).squeeze() # Remove locations with NaN values
-        valid_z_array= z_array[valid_indices]
+    for i in range(len(obs_data)): # Iterate through each timestep
+        # Convert to numpy array and handle NaNs
+        obs_array = obs_data.iloc[i, :].to_numpy().reshape(-1, 1)
+
+        valid_indices = ~np.isnan(obs_array).squeeze() # Remove locations with NaN values
+        valid_obs_array= obs_array[valid_indices]
 
         # Make sure both array shapes are compatible
         valid_data_coords= data_coords[valid_indices]
 
         # Stack the data and the coordinates
+        gw_data_stack = np.hstack((valid_data_coords, valid_obs_array))
+        z_data_list.append(gw_data_stack)
+
+    return z_data_list
+
+
+def create_interpolation_data(spatial_data: pd.DataFrame, obs_coords: pd.DataFrame) -> List[np.ndarray]:
+    """
+    Prepares spatial data for interpolation by associating observations
+    with their spatial coordinates.
+    
+    Parameters:
+    - spatial_data: DataFrame containing the observed data with dates and measurement values 
+        (format: rows = timesteps, columns = names of in situ locations)
+    - obs_coords: DataFrame containing the coordinates of in situ locations, expected to have columns for x, y coordinates.
+    
+    Returns:
+    - A list of numpy arrays, each containing the spatial coordinates and groundwater measurements
+      for each timestep.
+    """
+    # Pre-calculate constant coordinates and ensure they align with spatial data
+    data_coords = obs_coords.iloc[:, :2].to_numpy()
+    assert data_coords.shape[0] == spatial_data.shape[1], "Mismatch in number of locations between spatial data and coordinates."
+
+    z_data_list = []  # List of arrays with spatial coordinates and corresponding data values for each timestep
+    for measurements in spatial_data.itertuples(index=False):
+        # Convert to numpy array and handle NaNs
+        valid_indices = ~np.isnan(measurements)
+        valid_z_array = np.array(measurements)[valid_indices].reshape(-1, 1)
+        valid_data_coords = data_coords[valid_indices]
+
+        # Combine coordinates with valid measurement data
         gw_data_stack = np.hstack((valid_data_coords, valid_z_array))
         z_data_list.append(gw_data_stack)
 
     return z_data_list
+
 
 #--------------------------------------------------------------------------------------------------------------------------------------
 #%% IDW function for 2D arrays with retention of original values
@@ -165,12 +204,14 @@ def idw_2d(source_x:np.array, source_y:np.array, z_values:np.array,
     return interpolated_grid
 
 #--------------------------------------------------------------------------------------------------------------------------------------
-@jit(nopython=True, fastmath=True, nogil=True, cache=True, parallel=True) 
+
 """
 Decorator for the function.
 It Numba's jit decorator to compile the code into machine language for fast execution
 which is useful for computationally intensive tasks like bilinear interpolation.
 """
+@jit(nopython=True, fastmath=True, nogil=True, cache=True, parallel=True) 
+
 def bilinear_interpolation(x_in, y_in, f_in, x_out, y_out):
     """
     Perform bilinear interpolation from a 5 km grid to a specified output grid size.
@@ -227,11 +268,3 @@ def bilinear_interpolation(x_in, y_in, f_in, x_out, y_out):
                            ((x2 - x1) * (y2 - y1)))
     
     return f_out
-
-
-    
-    """
-
-# %%
-
-
