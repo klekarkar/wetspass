@@ -118,8 +118,6 @@ def gridded_pet(df:DataFrame, variable,start_date,resample_freq:str,min_x, max_x
 
 #*******************************************************************************************************************************************************
 
-
-
 # %%
 """
 WRITE INPUT DATA ARRAYS TO ASCII GRID FILES
@@ -207,19 +205,23 @@ def compute_psychrometric_constant(elevation):
     Returns:
         float: psychrometric constant in kPa/C
     """
+    #compute atmospheric pressure (P) in kPa
     P= 101.3 * ((293 - 0.0065 * elevation) / 293) ** 5.26
 
-    gamma=0.000665 * P
+    gamma=P * (0.665*10**-3)
     return gamma
 
-def compute_saturation_vapor_pressure(Tmean):
+def compute_saturation_vapor_pressure(Tmax, Tmin):
     """Computes the saturation vapor pressure (es) in kPa
     Args:
-        T (float): temperature in degrees Celsius
+        Tmax (float):max. daily temperature in degrees Celsius
+        Tmin (float):min. daily temperature in degrees Celsius
     Returns:
         float: saturation vapor pressure in kPa
     """
-    es=0.6108 * np.exp((17.27 * Tmean) / (Tmean + 237.3))
+    e_Tmax=0.6108 * np.exp((17.27 * Tmax) / (Tmax + 237.3))
+    e_Tmin=0.6108 * np.exp((17.27 * Tmin) / (Tmin + 237.3))
+    es=(e_Tmax + e_Tmin) / 2
     return es
 
 
@@ -250,7 +252,7 @@ def vapor_pressure_deficit(Tmax, Tmin, Tmean, RHmean):
     es_tmax = compute_saturation_vapor_pressure(Tmax)
     es_tmin = compute_saturation_vapor_pressure(Tmin)
     es=(es_tmax + es_tmin) / 2
-    ea = compute_saturation_vapor_pressure(dew_point_temperature(Tmean, RHmean))
+    ea = 0.6108*np.exp((dew_point_temperature(Tmean, RHmean)*17.27)/(dew_point_temperature(Tmean, RHmean)+237.3))
 
     return es - ea
 
@@ -267,6 +269,10 @@ def compute_2m_wind_speed(uz,z):
 
 
 def compute_net_radiation(latitude,day_of_year,elevation,Tmax,Tmin,Tmean, RHmean):
+    #Reference: Allen, R.G., Pereira, L.S., Raes, D. and Smith, M., 1998. Crop evapotranspiration-Guidelines for computing crop water requirements-FAO Irrigation and drainage paper 56.
+    #https://www.fao.org/4/X0490E/x0490e07.htm#radiation
+
+
     """Computes the net radiation (Rn) in MJ/m2/day
     Args:
         latitude (float): latitude in degrees
@@ -276,9 +282,9 @@ def compute_net_radiation(latitude,day_of_year,elevation,Tmax,Tmin,Tmean, RHmean
     """
     #compute extraterrestrial radiation
     Gsc=0.082 #solar constant in MJ/m2/min
-    dr=1+0.033*np.cos(2*np.pi*day_of_year/365)
-    phi=latitude*np.pi/180 #latitude degrees converted to radians (pi/180 converts degrees to radians) (positive for northern hemisphere)
-    delta=0.409*np.sin((2*np.pi*day_of_year/365)-1.39) #solar declination in radians
+    dr=1+0.033*np.cos(2*np.pi*day_of_year/365) #inverse relative distance Earth-Sun
+    phi=np.radians(latitude) #latitude degrees converted to radians (pi/180 converts degrees to radians) (positive for northern hemisphere)
+    delta=0.409*np.sin((2*np.pi*day_of_year/365)-1.39) #solar decimation
     omega_ws=np.arccos(-np.tan(phi)*np.tan(delta)) #sunset hour angle in radians
     Ra=(24*60/np.pi)*Gsc*dr*(omega_ws*np.sin(phi)*np.sin(delta)+np.cos(phi)*np.cos(delta)*np.sin(omega_ws))
 
@@ -319,7 +325,7 @@ def compute_net_radiation(latitude,day_of_year,elevation,Tmax,Tmin,Tmean, RHmean
     """
     sigma=4.903*10**-9 #Stefan-Boltzmann constant in MJ/K^4/m^2/day
     ea=compute_saturation_vapor_pressure(dew_point_temperature(Tmean, RHmean))
-    Rnl=sigma*((Tmax+273.16)**4+(Tmin+273.16)**4)/2*(0.34-0.14*np.sqrt(ea))*(1.35*Rns/Rso-0.35)
+    Rnl=sigma*(((Tmax+273.16)**4+(Tmin+273.16)**4)/2)*(0.34-0.14*np.sqrt(ea))*(1.35*Rns/Rso-0.35)
 
     #compute net radiation (Rn) (MJ/m2/day)
     Rn=Rns-Rnl
