@@ -12,7 +12,8 @@ import glob
 ascii_dir = r"W:/VUB/main_research/model_sims/wetspass/outputs"
 
 wb_variables = ['Cell_evapotranspiration', 'recharge', 'Cell_runoff', 'gwdepth', 'Interception']
-#%% Define coordinate arrays
+#%% Define coordinate arrays of the study area (the order is gridx: minx, min_y, resolution)
+#make sure the resolution matches that of your input data (check from the headerfile of the ascii files)
 gridx = np.arange(159600, 163350, 10, dtype=np.float32) 
 gridy = np.arange(207200, 205500, -10, dtype=np.float32)
 
