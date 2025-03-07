@@ -8,18 +8,19 @@ import matplotlib.pyplot as plt
 import glob
 
 #%%
-# Define the directory where the ASCII files are located
+# Define the directory where the output ASCII files are located
 ascii_dir = r"W:/VUB/main_research/model_sims/wetspass/outputs"
 
 wb_variables = ['Cell_evapotranspiration', 'recharge', 'Cell_runoff', 'gwdepth', 'Interception']
-#%% Define coordinate arrays of the study area (the order is gridx: minx, min_y, resolution)
+#%% Define coordinate arrays of the study area (the order is gridx: minx, max_x, resolution, same logic for grid y)
 #make sure the resolution matches that of your input data (check from the headerfile of the ascii files)
-gridx = np.arange(159600, 163350, 10, dtype=np.float32) 
-gridy = np.arange(207200, 205500, -10, dtype=np.float32)
+#The values given here are projected EPSG31370
+gridx = np.arange(159600, 163350, 10, dtype=np.float32) #longitudes
+gridy = np.arange(207200, 205500, -10, dtype=np.float32) #latitudes
 
 # Define the start date of the time series
-start_date = "2003-09-30"
-time_frequency = "M"
+start_date = "2003-09-30" #the first timestep
+time_frequency = "M" #monthly frequency of wetsapss outputs
 
 variables_data_arrays = []
 
@@ -74,7 +75,8 @@ wb_dataset.attrs["contact"] = "klekarkar@gmail.com"
 # Save the dataset to a netCDF file
 output_file = os.path.join(ascii_dir, "wetspass_outputs.nc")
 #wb_dataset.to_netcdf(output_file)
-# %%
+
+# %% check the output and plot
 vars=['Cell_evapotranspiration', 'recharge', 'Cell_runoff', 'Interception']
 var='Cell_runoff'
 result = wb_dataset[var].sel(lon=162003.87, lat=205395.85, method='nearest')
